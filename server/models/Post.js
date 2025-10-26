@@ -1,6 +1,24 @@
-// Post.js - Mongoose model for blog posts
+// Post.js - Mongoose model for JBest Eyes blog posts
 
 const mongoose = require('mongoose');
+
+const CommentSchema = new mongoose.Schema({
+  author: {
+    type: String,
+    required: [true, 'Please provide author name'],
+    trim: true,
+    maxlength: [50, 'Author name cannot be more than 50 characters']
+  },
+  content: {
+    type: String,
+    required: [true, 'Please provide comment content'],
+    maxlength: [500, 'Comment cannot be more than 500 characters']
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
 
 const PostSchema = new mongoose.Schema(
   {
@@ -16,78 +34,58 @@ const PostSchema = new mongoose.Schema(
     },
     featuredImage: {
       type: String,
-      default: 'default-post.jpg',
-    },
-    slug: {
-      type: String,
-      required: true,
-      unique: true,
+      default: '',
     },
     excerpt: {
       type: String,
       maxlength: [200, 'Excerpt cannot be more than 200 characters'],
-    },
-    author: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
     },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
       required: true,
     },
-    tags: [String],
+    tags: [{
+      type: String,
+      trim: true
+    }],
     isPublished: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     viewCount: {
       type: Number,
       default: 0,
     },
-    comments: [
-      {
-        user: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'User',
-        },
-        content: {
-          type: String,
-          required: true,
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
+    comments: [CommentSchema],
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
 );
 
-// Create slug from title before saving
+// Create excerpt from content if not provided
 PostSchema.pre('save', function (next) {
-  if (!this.isModified('title')) {
-    return next();
+  if (!this.excerpt && this.content) {
+    this.excerpt = this.content.substring(0, 150) + '...';
   }
-  
-  this.slug = this.title
-    .toLowerCase()
-    .replace(/[^\w ]+/g, '')
-    .replace(/ +/g, '-');
-    
   next();
 });
 
-// Virtual for post URL
-PostSchema.virtual('url').get(function () {
-  return `/posts/${this.slug}`;
+// Virtual for formatted date
+PostSchema.virtual('formattedDate').get(function () {
+  return this.createdAt.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 });
 
 // Method to add a comment
-PostSchema.methods.addComment = function (userId, content) {
-  this.comments.push({ user: userId, content });
+PostSchema.methods.addComment = function (author, content) {
+  this.comments.push({ author, content });
   return this.save();
 };
 
